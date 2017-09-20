@@ -20,7 +20,7 @@ func TestTagServiceHostPort(t *testing.T) {
 	}
 	ctrl := gomock.NewController(t)
 	mCatalog := mock_api.NewMockCatalog(ctrl)
-	Catalog = mCatalog
+	ConsulCatalog = mCatalog
 	{
 		mCatalog.EXPECT().Service(st.Service, st.Tag, nil).Return([]*api.CatalogService{}, nil, nil).Times(1)
 		_, err := TagServiceHostPort(st.Service, st.Tag)

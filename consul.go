@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fresh8/consul/api_if"
 	"github.com/hashicorp/consul/api"
 	"github.com/pkg/errors"
 )
@@ -22,8 +21,8 @@ var (
 	ErrNoService = errors.New("no service registered under this service name and tag")
 
 	// Consul client
-	Client  *api.Client
-	Catalog api_if.Catalog
+	Client        *api.Client
+	ConsulCatalog Catalog
 
 	serviceCache      = make(map[serviceTag]*consulService)
 	serviceCacheMutex = sync.RWMutex{}
@@ -40,7 +39,7 @@ type consulService struct {
 
 func Setup() error {
 	var err error
-	if Client != nil && Catalog != nil {
+	if Client != nil && ConsulCatalog != nil {
 		log.Println("Consul already initialised")
 		return nil
 	}
@@ -52,7 +51,7 @@ func Setup() error {
 		return ErrNoCatalog
 	}
 
-	Catalog = Client.Catalog()
+	ConsulCatalog = Client.Catalog()
 
 	return nil
 }
@@ -60,7 +59,7 @@ func Setup() error {
 // ServiceHostPort looks up a service by just service name or tag.service
 // from local Consul agent
 func ServiceHostPort(service string) (string, error) {
-	if Catalog == nil {
+	if ConsulCatalog == nil {
 		return "", ErrNoCatalog
 	}
 
@@ -100,12 +99,12 @@ func TagServiceHostPort(service, tag string) (hostPort string, err error) {
 			err = nil
 		}
 	}()
-	if Catalog == nil {
+	if ConsulCatalog == nil {
 		err = ErrNoCatalog
 		return
 	}
 
-	cservices, _, err := Catalog.Service(service, tag, nil)
+	cservices, _, err := ConsulCatalog.Service(service, tag, nil)
 	if err != nil {
 		return
 	}
@@ -120,7 +119,7 @@ func TagServiceHostPort(service, tag string) (hostPort string, err error) {
 	addr := cservice.ServiceAddress
 	if addr == "" {
 		var node *api.CatalogNode
-		node, _, err = Catalog.Node(cservice.Node, nil)
+		node, _, err = ConsulCatalog.Node(cservice.Node, nil)
 		if err != nil {
 			err = errors.Wrap(err, "service registered on a node that does not exist")
 			return

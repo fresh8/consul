@@ -1,6 +1,6 @@
 // Created by interfacer; DO NOT EDIT
 
-package api_if
+package consul
 
 import (
 	"github.com/hashicorp/consul/api"

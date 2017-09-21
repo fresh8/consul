@@ -33,8 +33,26 @@ type serviceTag struct {
 }
 
 type consulService struct {
-	HostPort  string
+	HostPort  []string
 	LastError *time.Time
+}
+
+// SameHosts returns true if cs.HostPort has exactly the same values
+// as the hosts param
+func (cs *consulService) SameHosts(hosts []string) bool {
+	if len(cs.HostPort) != len(hosts) {
+		return false
+	}
+	oldHosts := make(map[string]bool)
+	for _, host := range cs.HostPort {
+		oldHosts[host] = true
+	}
+	for _, host := range hosts {
+		if !oldHosts[host] {
+			return false
+		}
+	}
+	return true
 }
 
 func Setup() error {
@@ -74,6 +92,22 @@ func ServiceHostPort(service string) (string, error) {
 // TagServiceHostPort looks up a service by service name and tag
 // from local Consul agent
 func TagServiceHostPort(service, tag string) (hostPort string, err error) {
+	hostPorts, err := TagServiceHostPortMulti(service, tag)
+	if err != nil {
+		return
+	}
+	// This should not happen as TagServiceHostPortMulti returns err if no
+	// services
+	if len(hostPorts) == 0 {
+		return "", err
+	}
+	index := rand.Intn(len(hostPorts))
+	return hostPorts[index], nil
+}
+
+// TagServiceHostPortMulti looks up a service by service name and tag
+// from local Consul agent
+func TagServiceHostPortMulti(service, tag string) (hostPort []string, err error) {
 	st := serviceTag{Service: service, Tag: tag}
 	defer func() {
 		if err != nil {
@@ -113,26 +147,26 @@ func TagServiceHostPort(service, tag string) (hostPort string, err error) {
 		err = ErrNoService
 		return
 	}
-	index := rand.Intn(len(cservices))
+	hostPort = make([]string, 0, len(cservices))
 
-	cservice := cservices[index]
-	addr := cservice.ServiceAddress
-	if addr == "" {
-		var node *api.CatalogNode
-		node, _, err = ConsulCatalog.Node(cservice.Node, nil)
-		if err != nil {
-			err = errors.Wrap(err, "service registered on a node that does not exist")
-			return
+	for _, cservice := range cservices {
+		addr := cservice.ServiceAddress
+		if addr == "" {
+			var node *api.CatalogNode
+			node, _, err = ConsulCatalog.Node(cservice.Node, nil)
+			if err != nil {
+				err = errors.Wrap(err, "service registered on a node that does not exist")
+				return
+			}
+			addr = node.Node.Address
 		}
-		addr = node.Node.Address
+		hostPort = append(hostPort, fmt.Sprintf("%s:%d", addr, cservice.ServicePort))
 	}
-
-	hostPort = fmt.Sprintf("%s:%d", addr, cservice.ServicePort)
 
 	// Add service to map if it doesn't exist or update host port
 	serviceCacheMutex.RLock()
 	firstLookup := serviceCache[st] == nil
-	hostPortChanged := !firstLookup && serviceCache[st].HostPort != hostPort
+	hostPortChanged := !firstLookup && serviceCache[st].SameHosts(hostPort)
 	serviceCacheMutex.RUnlock()
 
 	if firstLookup {

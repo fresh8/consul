@@ -55,4 +55,53 @@ func TestTagServiceHostPort(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "nodeAddress:80", hostPort, "the node address should be concatenated with service port")
 	})
+	t.Run("standard lookup", func(t *testing.T) {
+		mCatalog.EXPECT().Service("service3", "", nil).Return([]*api.CatalogService{
+			&api.CatalogService{
+				ServiceAddress: "serviceAddress",
+				ServicePort:    80,
+			},
+		}, nil, nil).Times(1)
+		hostPort, err := TagServiceHostPort("service3", "")
+		assert.NoError(t, err)
+		assert.Equal(t, "serviceAddress:80", hostPort, "service address should be used with service port")
+	})
+	t.Run("success followed by failure", func(t *testing.T) {
+		mCatalog.EXPECT().Service("service4", "", nil).Return([]*api.CatalogService{
+			&api.CatalogService{
+				ServiceAddress: "serviceAddress",
+				ServicePort:    80,
+			},
+		}, nil, nil).Times(1)
+		hostPort, err := TagServiceHostPort("service4", "")
+		assert.NoError(t, err)
+		assert.Equal(t, "serviceAddress:80", hostPort, "service address should be used with service port")
+
+		mCatalog.EXPECT().Service("service4", "", nil).Return(nil, nil, errors.New("random error")).Times(1)
+
+		hostPort, err = TagServiceHostPort("service4", "")
+		assert.NoError(t, err, "there should not be an error as there was a recent successful lookup")
+		assert.Equal(t, "serviceAddress:80", hostPort, "service address should be used with service port")
+	})
+	t.Run("host port changes after first lookup", func(t *testing.T) {
+		mCatalog.EXPECT().Service("service5", "", nil).Return([]*api.CatalogService{
+			&api.CatalogService{
+				ServiceAddress: "serviceAddress",
+				ServicePort:    80,
+			},
+		}, nil, nil).Times(1)
+		hostPort, err := TagServiceHostPort("service5", "")
+		assert.NoError(t, err)
+		assert.Equal(t, "serviceAddress:80", hostPort, "service address should be used with service port")
+		mCatalog.EXPECT().Service("service5", "", nil).Return([]*api.CatalogService{
+			&api.CatalogService{
+				ServiceAddress: "serviceAddress2",
+				ServicePort:    80,
+			},
+		}, nil, nil).Times(1)
+		hostPort, err = TagServiceHostPort("service5", "")
+
+		assert.NoError(t, err, "there should not be an error as there was a recent successful lookup")
+		assert.Equal(t, "serviceAddress2:80", hostPort, "service address should be used with service port")
+	})
 }

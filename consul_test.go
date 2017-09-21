@@ -104,4 +104,26 @@ func TestTagServiceHostPort(t *testing.T) {
 		assert.NoError(t, err, "there should not be an error as there was a recent successful lookup")
 		assert.Equal(t, "serviceAddress2:80", hostPort, "service address should be used with service port")
 	})
+
+	t.Run("multi host port", func(t *testing.T) {
+		cservices := []*api.CatalogService{
+			&api.CatalogService{
+				ServiceAddress: "serviceAddress1",
+				ServicePort:    80,
+			},
+			&api.CatalogService{
+				ServiceAddress: "serviceAddress2",
+				ServicePort:    80,
+			},
+		}
+		expectedHostPorts := []string{
+			"serviceAddress1:80",
+			"serviceAddress2:80",
+		}
+		mCatalog.EXPECT().Service("service10", "", nil).Return(cservices, nil, nil).Times(1)
+
+		hostPorts, err := TagServiceHostPortMulti("service10", "")
+		assert.NoError(t, err)
+		assert.Equal(t, expectedHostPorts, hostPorts)
+	})
 }

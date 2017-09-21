@@ -166,7 +166,7 @@ func TagServiceHostPortMulti(service, tag string) (hostPort []string, err error)
 	// Add service to map if it doesn't exist or update host port
 	serviceCacheMutex.RLock()
 	firstLookup := serviceCache[st] == nil
-	hostPortChanged := !firstLookup && serviceCache[st].SameHosts(hostPort)
+	hostPortChanged := !firstLookup && !serviceCache[st].SameHosts(hostPort)
 	serviceCacheMutex.RUnlock()
 
 	if firstLookup {
